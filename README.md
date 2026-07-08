@@ -30,9 +30,9 @@ src/
   CardsApi.Application/     -> Interfaces/{Repositories,Services}, Services (CardService,
                                 AuthService), Dtos, Common/ApiException, DependencyInjection.cs
   CardsApi.Infrastructure/  -> Data/AppDbContext + Configurations/, Migrations/, Repositories/
-                                (CardRepository, SessionRepository, UserRepository), Services/
-                                (TokenService, CryptoService, SessionValidator,
-                                BCryptPasswordHasher), DependencyInjection.cs
+                                (GenericRepository<T> base + CardRepository, SessionRepository,
+                                UserRepository), Services/ (TokenService, CryptoService,
+                                SessionValidator, BCryptPasswordHasher), DependencyInjection.cs
   CardsApi/                 -> Controllers, Middleware, Configuration/AuthenticationExtensions.cs,
                                 Program.cs (composition root, projeto executável)
 ```
@@ -261,7 +261,9 @@ nunca o valor do PIN.
   ou abordagem equivalente" (pastas já bastariam). Optamos por separar fisicamente para
   que a regra de dependência fosse imposta pelo compilador, não só por convenção —
   o que só tem efeito real com `ICardRepository`/`ISessionRepository`/`IUserRepository`
-  desacoplando `CardService`/`AuthService` do EF Core.
+  desacoplando `CardService`/`AuthService` do EF Core. `CardRepository`/`SessionRepository`/
+  `UserRepository` herdam de `GenericRepository<TEntity>`, que centraliza `AddAsync`/
+  `SaveChangesAsync` (únicos membros repetidos entre eles).
 
 ---
 

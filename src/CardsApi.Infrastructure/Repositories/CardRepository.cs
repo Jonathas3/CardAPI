@@ -5,23 +5,19 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CardsApi.Infrastructure.Repositories;
 
-public class CardRepository : ICardRepository
+public class CardRepository : GenericRepository<Card>, ICardRepository
 {
-    private readonly DbSet<Card> _cards;
     private readonly DbSet<PinAccessLog> _pinAccessLogs;
-    private readonly AppDbContext _db;
 
-    public CardRepository(AppDbContext db)
+    public CardRepository(AppDbContext db) : base(db)
     {
-        _db = db;
-        _cards = db.Cards;
         _pinAccessLogs = db.PinAccessLogs;
     }
 
     public async Task<CardListResult> ListAsync(
         Guid userId, DateOnly? expirationFrom, DateOnly? expirationTo, int page, int pageSize, CancellationToken ct)
     {
-        var query = _cards.AsNoTracking().Where(c => c.UserId == userId && !c.IsDeleted);
+        var query = DbSet.AsNoTracking().Where(c => c.UserId == userId && !c.IsDeleted);
 
         if (expirationFrom is not null)
         {
@@ -45,19 +41,11 @@ public class CardRepository : ICardRepository
     }
 
     public Task<Card?> FindByIdAsync(Guid userId, Guid cardId, CancellationToken ct) =>
-        _cards.FirstOrDefaultAsync(c => c.Id == cardId && c.UserId == userId, ct);
-
-    public Task AddAsync(Card card, CancellationToken ct)
-    {
-        _cards.Add(card);
-        return Task.CompletedTask;
-    }
+        DbSet.FirstOrDefaultAsync(c => c.Id == cardId && c.UserId == userId, ct);
 
     public Task AddPinAccessLogAsync(PinAccessLog log, CancellationToken ct)
     {
         _pinAccessLogs.Add(log);
         return Task.CompletedTask;
     }
-
-    public Task SaveChangesAsync(CancellationToken ct) => _db.SaveChangesAsync(ct);
 }
