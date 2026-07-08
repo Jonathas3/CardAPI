@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cardsapi-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cardsdb
+      POSTGRES_USER: cardsapi
+      POSTGRES_PASSWORD: cardsapi_pwd
+    ports:
+      - "5432:5432"
+    volumes:
+      - cardsapi-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cardsapi -d cardsdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  cardsapi-pgdata:
