@@ -107,11 +107,65 @@ Depois da divisão em 4 projetos, mais uma rodada de ajustes:
 PIN, refresh (passando pelo novo `ISessionValidator`), CRUD completo via os novos métodos da
 entidade, Swagger — tudo confirmado funcionando.
 
+### `CardStatus` vira enum, `IAppDbContext` removido, `GenericRepository<T>` (2026-07-07)
+
+Várias mudanças pontuais na mesma sessão:
+
+- **`CardStatus`**: de classe com constantes `string` para `enum` (`Active`/`Blocked`/`Cancelled`),
+  armazenado como `integer` no banco (`ck_cards_status` virou `status IN (0,1,2)`). Contrato da API
+  não mudou (`"status": "ACTIVE"` continua igual — `CardService` converte enum↔string nas bordas).
+  Isso exigiu recriar o volume do Postgres (`docker compose down -v` + `up`), porque a migration
+  `InitialCreate` foi editada no lugar (mesmo id) e o banco já tinha aplicado a versão antiga.
+  De quebra, `Card.SetStatus`/`CardService.ApplyStatus` foram removidos (viraram wrappers triviais
+  depois do enum) — `Card.Status` agora é `{ get; set; }` normal, como `Nickname`/`Brand`.
+- **`IAppDbContext` removido**: interface só existia pra restringir o que os repositórios viam do
+  `AppDbContext` (escondendo `Database.Migrate()`/`ChangeTracker`) — desacoplamento redundante, já
+  que `ICardRepository`/`ISessionRepository`/`IUserRepository` já isolam `Application` do EF Core.
+  Repositórios passaram a receber `AppDbContext` direto.
+- **`GenericRepository<TEntity>`**: nova classe base abstrata que centraliza `AddAsync`/
+  `SaveChangesAsync` (únicos membros repetidos entre `CardRepository`/`SessionRepository`/
+  `UserRepository`). Cada repositório concreto herda dela e só implementa o que é específico
+  (`ListAsync`/`FindByIdAsync` no `CardRepository`, etc.).
+- **Criptografia (`CryptoService`) — explorado e revertido**: chegou a ser trocada de AES-256-GCM
+  para uma cifra XOR de chave repetida (pedido explícito de "sem biblioteca"), incluindo
+  reencriptação de todo o seed. Revertida na mesma sessão de volta pra AES-256-GCM original
+  (`git blame`/histórico não guarda esse desvio — só este log). **Estado atual: AES-256-GCM, sem
+  mudança líquida em relação à entrada anterior.**
+
+**Validado** (volume recriado do zero pelo menos duas vezes durante essas mudanças): build 0
+erros/avisos, `dotnet test` 11/11, login, listagem (`totalItems=12`), criação, `GET /{id}/pin`
+com PIN correto, PATCH de status (válido e inválido), soft delete e refresh de token — todos
+exercitados via requisição HTTP real após cada mudança, não só leitura de código.
+
+### Repositório Git criado (2026-07-07)
+
+Projeto publicado em `https://github.com/Jonathas3/CardAPI` (branch `main`). `.gitignore` já
+existente cobre `bin/`, `obj/`, `.vscode/`, `.claude/` e `CLAUDE.md`.
+
+### Projetos renomeados de `CardsApi.*` para `Cards.*` (2026-07-08)
+
+Os 4 projetos físicos e o projeto de testes foram renomeados: `CardsApi.Domain` -> `Cards.Domain`,
+`CardsApi.Application` -> `Cards.Application`, `CardsApi.Infrastructure` -> `Cards.Infrastructure`,
+`CardsApi` (executável) -> `Cards.Api`, `tests/CardsApi.Application.Tests` -> `tests/Cards.Application.Tests`.
+Pastas, `.csproj`, `RootNamespace`, `ProjectReference` e todo `namespace`/`using` no código (52
+arquivos `.cs`) foram atualizados. `CardsApi.sln` manteve o nome (não foi pedido renomear o
+arquivo de solution). O rename das pastas via `Rename-Item` deu "acesso negado" pelo mesmo motivo
+de sempre (processo do C# Dev Kit segurando lock) — resolvido matando o `ProjectSystem.Server.BuildHost.dll`
+e, quando ainda assim não liberou, movendo o conteúdo pra pasta nova em vez de renomear a pasta
+em si (mesmo workaround já documentado nesta sessão). O `.sln` perdeu as referências de projeto
+durante o processo (provavelmente a IDE "corrigiu" automaticamente ao ver os caminhos quebrados) —
+recriadas com `dotnet sln add`.
+
+**Comando atual pra rodar:** `dotnet run --project src\Cards.Api\Cards.Api.csproj`.
+
+**Validado**: `dotnet build CardsApi.sln` (0 avisos/erros, 5 projetos), `dotnet test` (11/11),
+API sobe, Swagger `200` com os 5 endpoints, login + listagem (`totalItems=12`) funcionando.
+
 ## 0. Pré-requisitos
 
 - [x] `docker compose up -d` — sobe o Postgres **vazio** (schema/seed aplicados pela API, não por script).
 - [x] `docker compose ps` — `cardsapi-postgres` deve estar `Up (healthy)`.
-- [x] `dotnet run --project src\CardsApi\CardsApi.csproj` — aplica as migrations automaticamente e sobe a
+- [x] `dotnet run --project src\Cards.Api\Cards.Api.csproj` — aplica as migrations automaticamente e sobe a
       API em `http://localhost:5080`.
 - [x] Abrir `http://localhost:5080/swagger` — Swagger UI carrega sem erro.
 

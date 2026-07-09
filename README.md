@@ -5,7 +5,7 @@ usando **PostgreSQL** + **Entity Framework Core**, com **Swagger** habilitado.
 
 > Nenhum arquivo SQL foi anexado à prova recebida (apenas o PDF de enunciado). O
 > schema foi desenhado do zero e é aplicado via **EF Core Migrations**
-> (`src/CardsApi.Infrastructure/Migrations/`), conforme permitido pelo próprio enunciado
+> (`src/Cards.Infrastructure/Migrations/`), conforme permitido pelo próprio enunciado
 > ("documente a decisão no README e entregue os scripts/migrations correspondentes").
 > A migration aplica schema **e** seed juntos, automaticamente, na subida da API.
 
@@ -26,14 +26,14 @@ regra de dependência clássica (camadas internas nunca referenciam as externas)
 ```
 CardsApi.sln
 src/
-  CardsApi.Domain/          -> Entities: Card, User, Session, PinAccessLog, CardStatus
-  CardsApi.Application/     -> Interfaces/{Repositories,Services}, Services (CardService,
+  Cards.Domain/             -> Entities: Card, User, Session, PinAccessLog, CardStatus
+  Cards.Application/        -> Interfaces/{Repositories,Services}, Services (CardService,
                                 AuthService), Dtos, Common/ApiException, DependencyInjection.cs
-  CardsApi.Infrastructure/  -> Data/AppDbContext + Configurations/, Migrations/, Repositories/
+  Cards.Infrastructure/     -> Data/AppDbContext + Configurations/, Migrations/, Repositories/
                                 (GenericRepository<T> base + CardRepository, SessionRepository,
                                 UserRepository), Services/ (TokenService, CryptoService,
                                 SessionValidator, BCryptPasswordHasher), DependencyInjection.cs
-  CardsApi/                 -> Controllers, Middleware, Configuration/AuthenticationExtensions.cs,
+  Cards.Api/                -> Controllers, Middleware, Configuration/AuthenticationExtensions.cs,
                                 Program.cs (composition root, projeto executável)
 ```
 
@@ -54,8 +54,8 @@ lugar que ainda toca o `AppDbContext` concreto é o `Database.Migrate()` do star
 # 1) sobe o Postgres (container vazio - o schema/seed vêm da migration, não de um script)
 docker compose up -d
 
-# 2) restaura pacotes e roda a API (projeto executável é o CardsApi)
-cd src/CardsApi
+# 2) restaura pacotes e roda a API (projeto executável é o Cards.Api)
+cd src/Cards.Api
 dotnet restore
 dotnet run
 ```
@@ -68,17 +68,17 @@ preciso rodar `dotnet ef database update` nem `psql` manualmente.
 A API sobe em `http://localhost:5080` e o Swagger fica em `http://localhost:5080/swagger`.
 
 Para gerar/aplicar migrations manualmente (`dotnet tool install --global dotnet-ef`),
-como o `DbContext` vive em `CardsApi.Infrastructure` mas o composition root vive em
-`CardsApi`, é preciso apontar os dois projetos:
+como o `DbContext` vive em `Cards.Infrastructure` mas o composition root vive em
+`Cards.Api`, é preciso apontar os dois projetos:
 
 ```bash
-dotnet ef database update --project src/CardsApi.Infrastructure --startup-project src/CardsApi
-dotnet ef migrations add NomeDaMigration --project src/CardsApi.Infrastructure --startup-project src/CardsApi
+dotnet ef database update --project src/Cards.Infrastructure --startup-project src/Cards.Api
+dotnet ef migrations add NomeDaMigration --project src/Cards.Infrastructure --startup-project src/Cards.Api
 ```
 
 ### Testes automatizados
 
-`tests/CardsApi.Application.Tests` cobre as regras centrais da prova sem depender do
+`tests/Cards.Application.Tests` cobre as regras centrais da prova sem depender do
 Postgres: paginação fixa em 10 itens, rejeição de intervalo de vencimento inválido,
 isolamento por usuário, mascaramento/criptografia na criação, PUT/PATCH/DELETE
 (incluindo rejeição de `status`/`cardNumber` inválidos) e auditoria do endpoint de PIN.
