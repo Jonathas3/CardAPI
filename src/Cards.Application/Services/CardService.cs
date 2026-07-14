@@ -60,6 +60,11 @@ public class CardService : ICardService
         var digits = dto.CardNumber.Trim();
         var now = DateTime.UtcNow;
 
+        if (dto.ExpirationDate < DateOnly.FromDateTime(now))
+        {
+            throw ApiException.BadRequest("expirationDate must not be in the past.");
+        }
+
         var card = new Card
         {
             Id = Guid.NewGuid(),
@@ -90,6 +95,11 @@ public class CardService : ICardService
     public async Task<CardResponseDto> ReplaceAsync(Guid userId, Guid cardId, CardReplaceDto dto, CancellationToken ct)
     {
         var card = await FindOwnedCardAsync(userId, cardId, ct);
+
+        if (dto.ExpirationDate < DateOnly.FromDateTime(DateTime.UtcNow))
+        {
+            throw ApiException.BadRequest("expirationDate must not be in the past.");
+        }
 
         var digits = dto.CardNumber.Trim();
 
@@ -131,7 +141,15 @@ public class CardService : ICardService
             card.UpdateCardNumber(_crypto.Encrypt(digits), digits[..4], digits[^4..], DateTime.UtcNow);
         }
 
-        if (dto.ExpirationDate is not null) card.ExpirationDate = dto.ExpirationDate.Value;
+        if (dto.ExpirationDate is not null)
+        {
+            if (dto.ExpirationDate < DateOnly.FromDateTime(DateTime.UtcNow))
+            {
+                throw ApiException.BadRequest("expirationDate must not be in the past.");
+            }
+
+            card.ExpirationDate = dto.ExpirationDate.Value;
+        }
         if (dto.CreditLimit is not null) card.CreditLimit = dto.CreditLimit.Value;
 
         if (dto.Status is not null)
